@@ -3,25 +3,20 @@ import traceback
 from pathlib import Path
 from pyspark import SparkContext
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
-from pyspark.mllib.feature import StandardScaler
 from pyspark.sql import SQLContext
 import pandas as pd
 from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.regression import GBTRegressor, GBTRegressionModel
 from pyspark.ml.evaluation import RegressionEvaluator
-from pyspark.sql.functions import from_unixtime, month, dayofmonth, hour, to_timestamp
+from pyspark.sql.functions import from_unixtime, month, dayofmonth, hour, to_timestamp, col
 from pyspark.sql import functions as F
-from setuptools._vendor.ordered_set import OrderedSet
+from pyspark.sql.types import DoubleType
 
 
-"""Receive the label from the main. This is also compared with a reference set containing all the columns of the dataset, 
-    so that we can remove the one utilized as label and utilize the remaining as features"""
+"""Receive the label from the main."""
 def setLabel():
     try:
         label = sys.argv[1]
-        referenceString=OrderedSet(['timestamp', 'humidity', 'light', 'pm10', 'pm2_5', 'pressure', 'rain', 'temperature', 'wind_dir', 'wind_dir_degrees', 'wind_force', 'wind_speed'])
-        originalCols= list(referenceString - OrderedSet(label))
-        print("Features -> "+" ".join(originalCols))
         print("Label -> "+label)
         return label
     except Exception as e:
@@ -29,15 +24,18 @@ def setLabel():
         print(e)
         print("Label Setting Error -> Cannot retrieve the label")
 
-
-"""Initilize sparkContext and sqlContext and read the dataset from the provided file"""
+"""Initialize sparkContext and sqlContext and read the dataset from the provided file"""
 def initialize():
     sc = SparkContext()
     sqlContext = SQLContext(sc)
     sc.setLogLevel("OFF")
     try:
         dataDf = sqlContext.read.format('com.databricks.spark.csv').options(header='true', inferschema='true').load("data/readings.csv")
-        return dataDf
+        newReading = sqlContext.read.json('./data/newReading.json')
+        newReading = newReading.withColumn(sys.argv[1], col(sys.argv[1]).cast(DoubleType()))
+        nr = newReading.na.fill(value=0.0, subset=[sys.argv[1]])
+
+        return dataDf, nr
     except Exception as e:
         print(traceback.format_exc())
         print(e)
@@ -65,15 +63,12 @@ def filterTimestamp(dataDf):
     return dataDf
 
 
-"""We extract the features from the modified dataframe and cache it to speed up future access. """
-def defineFeatures(dataDf):
-    features = dataDf.columns
-    print("New features -> "+" ".join(features))
+"""We  cache the df to speed up future access. """
+def cacheDataframe(dataDf):
     dataDf.cache()
     dataDf.printSchema()
     pd.set_option('display.expand_frame_repr', False)
     print(dataDf.toPandas().describe(include='all').transpose())
-    return features
 
 
 """not needed because the regressor it's already efficient"""
@@ -81,11 +76,13 @@ def defineFeatures(dataDf):
 
 
 """We vectorize the dataset utilizing the features and split the created dataframe  in train and test portions"""
-def vectorizeAndSplit(dataDf, features):
+def vectorizeDataframe(dataDf, features):
     vectorAssembler = VectorAssembler(inputCols=features, outputCol='features')
-    vDataDf = vectorAssembler.transform(dataDf)
+    dataDf = vectorAssembler.transform(dataDf)
+    return dataDf
 
-    splits = vDataDf.randomSplit([0.7, 0.3])
+def splitDataframe(dataDf):
+    splits = dataDf.randomSplit([0.7, 0.3])
     trainDf = splits[0]
     testDf = splits[1]
     return trainDf, testDf
@@ -109,7 +106,8 @@ def gbtRegression(label):
         gbtcv = CrossValidator(estimator = gbt,
                                estimatorParamMaps = gbtParamGrid,
                                evaluator = gbtEvaluator,
-                               numFolds = 5)
+                               numFolds = 5,
+                               parallelism=3)
         return gbtcv, gbtEvaluator
     except Exception as e:
         print(traceback.format_exc())
@@ -147,28 +145,41 @@ def trainOrLoad(label, gbtcv, trainDf):
 
 """We perform a prediction utilizing the best model obtained by the cross validation training and the test portion of the dataset. 
    In the end, an evaluation is performed on the resulting predictions"""
-def predictAndEvaluate(bestModel, label, testDf, gbtEvaluator):
+def predictAndEvaluate(bestModel, label, testDf, gbtEvaluator, nrFilteredDf):
     try:
         gbtPredictions = bestModel.transform(testDf)
         gbtPredictions.select("prediction", label, "features").show(5)
-
+        nrPredictions = bestModel.transform(nrFilteredDf)
+        nrPredictions.select("prediction", label, "features").show()
         print('RMSE:', gbtEvaluator.evaluate(gbtPredictions))
+        print('RMSE:', gbtEvaluator.evaluate(nrPredictions))
+
     except Exception as e:
         print(traceback.format_exc())
         print(e)
         print("Model Prediction Error -> Cannot perform the prediction on the model")
 
-
+def featureImportance(bestModel, features):
+    print("Feature Importances:")
+    for feature, importance in zip(features, bestModel.featureImportances):
+        print(f"{feature}: {importance:.4f}")
 
 def main():
-    dataDf = initialize()
+    dataDf, newReading = initialize()
     label = setLabel()
     filteredDf = filterTimestamp(dataDf)
-    features = defineFeatures(filteredDf)
-    trainSplit, testSplit = vectorizeAndSplit(filteredDf, features)
+    features=filteredDf.columns
+    features.remove(label)
+    cacheDataframe(filteredDf)
+    nrFilteredDf = filterTimestamp(newReading)
+    filteredDf=vectorizeDataframe(filteredDf, features)
+    trainSplit, testSplit = splitDataframe(filteredDf)
+    nrFilteredDf=vectorizeDataframe(nrFilteredDf, features)
     gbtcv, gbtEvaluator = gbtRegression(label)
     bestModel = trainOrLoad(label, gbtcv, trainSplit)
-    predictAndEvaluate(bestModel, label, testSplit, gbtEvaluator)
+    featureImportance(bestModel, features)
+    predictAndEvaluate(bestModel, label, testSplit, gbtEvaluator, nrFilteredDf)
+
 
 if __name__=="__main__":
     print("Gradient Boost Tree Regression Test Starting")

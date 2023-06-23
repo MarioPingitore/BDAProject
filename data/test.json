@@ -1,0 +1,14 @@
+{
+  "timestamp":1678134763546,
+  "humidity": 56.28223,
+  "light": 0,
+  "pm10": 24.97,
+  "pm2_5":22.58,
+  "pressure": 94.92268,
+  "rain": 0.52,
+  "temperature": null,
+  "wind_dir": 3,
+  "wind_dir_degrees": 120,
+  "wind_force": 2,
+  "wind_speed": 2.06
+}
