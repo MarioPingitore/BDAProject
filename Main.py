@@ -30,7 +30,7 @@ def setupKafka():
         print("Kafka Connection Error -> Cannot establish connection to the broker's topic")
 
 
-def setLabel(incomingReading):
+def setLabel(incomingReading): #
     try:
         #file=open("./data/test.json") #test
         #incomingReading=json.load(file) #test
@@ -54,10 +54,10 @@ def setLabel(incomingReading):
 def callRegressionTests(label):
     subprocess.call(['cmd', '/c', 'python CorrelationTest.py', label])
     subprocess.call(['cmd', '/c', 'python LinearRegression.py', label])
-    subprocess.call(['cmd', '/c', 'python DecisionTreeRegression.py', label])
     subprocess.call(['cmd', '/c', 'python IsotonicRegression.py', label])
-    subprocess.call(['cmd', '/c', 'python RandomForestRegression.py', label])
+    subprocess.call(['cmd', '/c', 'python DecisionTreeRegression.py', label])
     subprocess.call(['cmd', '/c', 'python GBTRegression.py', label])
+    subprocess.call(['cmd', '/c', 'python RandomForestRegression.py', label])
 
 
 def main():

@@ -153,7 +153,6 @@ def predictAndEvaluate(bestModel, label, testDf, irEvaluator, nrFilteredDf):
         nrPredictions = bestModel.transform(nrFilteredDf)
         nrPredictions.select("prediction", label, "features").show()
         print('RMSE:', irEvaluator.evaluate(irPredictions))
-        print('RMSE:', irEvaluator.evaluate(nrPredictions))
         print("Boundaries in increasing order: %s\n" % str(bestModel.boundaries))
         print("Predictions associated with the boundaries: %s\n" % str(bestModel.predictions))
     except Exception as e:

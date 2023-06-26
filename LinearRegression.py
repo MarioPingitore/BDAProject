@@ -73,7 +73,6 @@ def cacheDataframe(dataDf):
     pd.set_option('display.expand_frame_repr', False)
     print(dataDf.toPandas().describe(include='all').transpose())
 
-
 """We vectorize the dataset utilizing the features and split the created dataframe  in train and test portions"""
 def vectorizeDataframe(dataDf, features):
     vectorAssembler = VectorAssembler(inputCols=features, outputCol='features')
@@ -161,7 +160,6 @@ def predictAndEvaluate(bestModel, label, testDf, lrEvaluator, nrFilteredDf):
         nrPredictions = bestModel.transform(nrFilteredDf)
         nrPredictions.select("prediction", label, "features").show()
         print('RMSE:', lrEvaluator.evaluate(lrPredictions))
-        print('RMSE:', lrEvaluator.evaluate(nrPredictions))
 
     except Exception as e:
         print(traceback.format_exc())

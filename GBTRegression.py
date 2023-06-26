@@ -152,7 +152,6 @@ def predictAndEvaluate(bestModel, label, testDf, gbtEvaluator, nrFilteredDf):
         nrPredictions = bestModel.transform(nrFilteredDf)
         nrPredictions.select("prediction", label, "features").show()
         print('RMSE:', gbtEvaluator.evaluate(gbtPredictions))
-        print('RMSE:', gbtEvaluator.evaluate(nrPredictions))
 
     except Exception as e:
         print(traceback.format_exc())

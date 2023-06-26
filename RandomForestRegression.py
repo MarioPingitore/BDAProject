@@ -152,7 +152,6 @@ def predictAndEvaluate(bestModel, label, testDf, rfEvaluator, nrFilteredDf):
         nrPredictions = bestModel.transform(nrFilteredDf)
         nrPredictions.select("prediction", label, "features").show()
         print('RMSE:', rfEvaluator.evaluate(rfPredictions))
-        print('RMSE:', rfEvaluator.evaluate(nrPredictions))
         #print("Learned classification tree model:\n" + bestModel.toDebugString)
     except Exception as e:
         print(traceback.format_exc())
