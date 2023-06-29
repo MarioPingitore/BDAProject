@@ -1,0 +1,1 @@
+{"class":"org.apache.spark.ml.regression.IsotonicRegressionModel","timestamp":1687533171696,"sparkVersion":"3.3.2","uid":"IsotonicRegression_1438ceb1482c","paramMap":{"featuresCol":"features","isotonic":false,"labelCol":"temperature"},"defaultParamMap":{"featuresCol":"features","isotonic":true,"labelCol":"label","featureIndex":0,"predictionCol":"prediction"}}
